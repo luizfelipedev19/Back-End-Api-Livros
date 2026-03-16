@@ -1,0 +1,7 @@
+Banco da API
+
+Database: LivrosAPI
+porta 3309:3306
+senha do banco: z^T|1.8kGGu6
+
+senha luiz: EC8EB96oNJqf
