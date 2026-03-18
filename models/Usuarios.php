@@ -2,7 +2,7 @@
 class Usuarios
 {
     private PDO $conn;
-    private string $table = "Usuarios";
+    private string $table = "usuarios";
 
     public function __construct(PDO $db)
     {

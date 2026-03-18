@@ -2,7 +2,7 @@
 
 class Livro {
     private PDO $conn;
-    private string $table = "Livros";
+    private string $table = "livros";
 
     public function __construct(PDO $db)
     {
@@ -31,7 +31,7 @@ class Livro {
     }
 
     public function buscarPorId(int $idLivro, int $idUsuario): ?array {
-        $query = "SELECT id_livro, titulo, autor, ano from {$this->table} where id_livro = :id_livro and usuario_id = :usuario_id limit 1;"
+        $query = "SELECT id_livro, titulo, autor, ano from {$this->table} where id_livro = :id_livro and usuario_id = :usuario_id limit 1";
         
         $stmt = $this->conn->prepare($query);
         $stmt->bindValue(":id_livro", $idLivro);

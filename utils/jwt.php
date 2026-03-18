@@ -12,10 +12,10 @@ class JwtHandler
 
     public function __construct()
     {
-        $this->secret = $_ENV["JWT_SECRET"];
-        $this->alg = $_ENV["JWT_ALG"];
-        $this->exp = (int) $_ENV["JWT_EXP"];
-        $this->iss = $_ENV["JWT_ISS"];
+        $this->secret = $_ENV['JWT_SECRET'];
+        $this->alg = $_ENV['JWT_ALG'];
+        $this->exp = (int) $_ENV['JWT_EXP'];
+        $this->iss = $_ENV['JWT_ISS'];
     }
 
     public function gerarToken(array $usuarios): string
