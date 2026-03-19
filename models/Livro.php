@@ -61,7 +61,7 @@ class Livro {
     }
 
     public function deletarLivro(int $idLivro, int $idUsuario): bool {
-        $query = "delete from 1this->table
+        $query = "delete from {$this->table}
         where id_livro = :id_livro
         and usuario_id = :usuario_id";
 
@@ -71,7 +71,84 @@ class Livro {
         $stmt->bindValue(":usuario_id", $idUsuario);
 
         return $stmt->execute();
+
     }
+
+    public function listarComFiltros(
+        int $idUsuario,
+        string $titulo = '',
+        string $autor = '',
+        ?int $ano = null,
+        int $page = 1,
+        int $limit = 10,
+        string $sort = 'id',
+        string $order = 'asc'
+    ): array {
+        $offset = ($page -1) * $limit;
+
+        $where = "Where id_usuario = :id_usuario ";
+        $params = [
+            ':id_usuario' => $idUsuario
+        ];
+
+        if ($titulo !== ''){
+            $where .= " AND titulo like :titulo";
+            $params[':titulo'] = '%' . $titulo . '%';
+        }
+
+        if ($autor !== ''){
+            $where .= "AND autor like :autor";
+            $params['autor'] = '%' . $autor . '%';
+        }
+
+        if($ano !== null && $ano > 0){
+            $where .= "and ano = :ano";
+            $params[':ano'] = '%' . $ano . '%';
+        }
+
+        $sqlCount = "SELECT COUNT(*) as total from {$this->table}" . $where;
+        $stmtCount = $this->conn->prepare($sqlCount);
+
+        foreach ($params as $key => $value){
+            if($key === ':id_usuario' || $key === ':ano'){
+                $stmtCount->bindValue($key, $value, PDO::PARAM_INT);
+            } else {
+                $stmtCount->bindValue($key, $value, PDO::PARAM_STR);
+            }
+        }
+
+        $stmtCount->execute();
+        $total = (int) $stmtCount->fetch(PDO::FETCH_ASSOC)['total'];
+
+        $sql = "Select id, titulo, autor, ano from {$this->table} {$where}
+        order by {$sort} {$order} 
+        LIMIT :limit OFFSET :offset";
+
+        $stmt = $this->conn->prepare($sql);
+
+        foreach ($params as $key => $value){
+            if($key === ':id_usuario' || $key === ':ano'){
+                $stmt->bindValue($key, $value, PDO::PARAM_INT);
+            }else {
+                $stmt->bindValue($key, $value, PDO::PARAM_STR);
+            }
+        }
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+
+        $stmt->execute();
+
+        $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        return [
+            'item' => $items, 
+            'total' => $total, 
+            'page' => $page,
+            'limit' => $limit,
+            'total_pages' => (int) ceil($total / $limit)
+        ];
+
+    }
+
 }
 
 ?>

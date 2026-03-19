@@ -1,7 +1,8 @@
 <?php
 require_once __DIR__ . '/../models/Usuarios.php';
-require_once __DIR__ . '/../models/Livro.php';
 require_once __DIR__ . '/../utils/jwt.php';
+require_once __DIR__ . '/../DTO/RegisterUserDTO.php';
+require_once __DIR__ . '/../DTO/LoginDTO.php';
 
 class AuthController
 {
@@ -19,53 +20,12 @@ class AuthController
 
     public function register(): void
     {
-
+        try { 
         $data = json_decode(file_get_contents("php://input"), true);
 
-        $nome = trim($data["nome"] ?? "");
-        $email = trim($data["email"] ?? "");
-        $senha = trim($data["senha"] ?? "");
+        $dto = new RegisterUserDTO($data);
 
-        if (!$nome || !$email || !$senha) {
-            http_response_code(400);
-            echo json_encode(["mensagem" => "Nome, email e senha são obrigatórios"]);
-            return;
-        }
-
-
-        if(!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            http_response_code(400);
-            echo json_encode([ "Sucess" => "false",
-                "Mensagem" => "e-mail invalido"]);
-            return;
-        }
-        if(strlen($senha) < 8){
-            http_response_code(400);
-            echo json_encode(["Sucess" => "false",
-                "Mensagem" => "A senha deve ter pelo menos 8 caracteres"]);
-            return;
-
-        } elseif (!preg_match('/[A-Z]/', $senha)) {
-            http_response_code(400);
-            echo json_encode(["Sucess" => "false",
-                "Mensagem" => "A senha deve conter pelo menos uma letra maiúscula"]);
-            return;
-        } elseif (!preg_match('/[a-z]/', $senha)) {
-            http_response_code(400);
-            echo json_encode(["Sucess" => "false",
-                "Mensagem" => "A senha deve conter pelo menos uma letra minúscula"]);
-            return;
-        } elseif (!preg_match('/[0-9]/', $senha)) {
-            http_response_code(400);
-            echo json_encode(["Sucess" => "false",
-                "Mensagem" => "A senha deve conter pelo menos um numero"]);
-        } elseif (!preg_match('/[@#$%&*!+?=\-\[\]\{\}\|]/', $senha)) {
-            http_response_code(400);
-            echo json_encode(["Sucess" => "false",
-                "Mensagem" => "A senha deve conter pelo menos um caractere especial"]);
-        }
-
-        $usuarioExistente = $this->usuarioModel->buscarPorEmail($email);
+        $usuarioExistente = $this->usuarioModel->buscarPorEmail($dto->email);
 
         if ($usuarioExistente) {
             http_response_code(409);
@@ -74,9 +34,10 @@ class AuthController
             return;
         }
 
-        $senhaHash = password_hash($senha, PASSWORD_DEFAULT);
-
-        $criado = $this->usuarioModel->criar($nome, $email, $senhaHash);
+        $criado = $this->usuarioModel->criar(
+            $dto->nome,
+            $dto->email,
+            $dto->senha_hash);
 
         if ($criado) {
             http_response_code(201);
@@ -88,26 +49,30 @@ class AuthController
         http_response_code(500);
         echo json_encode(["sucess" => "false",
             "mensagem" => "Erro ao cadastrar usuário"]);
+
+    } catch(Exception $e){
+        http_response_code(400);
+        echo json_encode(["sucess" => false,
+        "mensagem" => $e->getMessage()]);
     }
+} 
+
+
 
     public function login(): void
     {
+
+        try{
         $data = json_decode(file_get_contents("php://input"), true);
 
-        $email = trim($data["email"] ?? "");
-        $senha = trim($data["senha"] ?? "");
+        $dto = new LoginDTO($data);
 
-        if (!$email || !$senha) {
+        $usuario = $this->usuarioModel->buscarPorEmail($dto->email);
+
+        if (!$usuario || !password_verify($dto->senha, $usuario["senha_hash"])) {
             http_response_code(401);
-            echo json_encode(["mensagem" => "Credenciais inválidas"]);
-            return;
-        }
-
-        $usuario = $this->usuarioModel->buscarPorEmail($email);
-
-        if (!$usuario || !password_verify($senha, $usuario["senha_hash"])) {
-            http_response_code(401);
-            echo json_encode(["mensagem" => "Senha não confere"]);
+            echo json_encode(["sucess" => false,
+             "mensagem" => "Senha não confere"]);
             return;
         }
 
@@ -118,7 +83,15 @@ class AuthController
             "mensagem" => "Login realizado com sucesso",
             "token" => $token
         ]);
+    } catch(Exception $e){
+        http_response_code(400);
+        echo json_encode([
+            "sucess" => false,
+            "mensagem" => $e->getMessage()
+        ]);
     }
+}
+
     public function perfil()
     {
         $usuario = AuthMiddleware::autenticar();
@@ -132,31 +105,3 @@ class AuthController
         ]);
     }
 
-    public function criarLivro(): void
-    {
-        $usuario = AuthMiddleware::autenticar();
-        $idUsuario = $usuario->data->id_usuario;
-
-        $data = json_decode(file_get_contents("php://input"), true);
-        $titulo = trim($data["titulo"] ?? "");
-
-        $autor = trim($data["autor"] ?? "");
-        $ano = (int) ($data["ano"] ?? 0);
-
-        if (!$titulo || !$autor || !$ano) {
-            http_response_code(400);
-            echo json_encode(["mensagem" => "Titulo, autor e ano são obrigatórios"]);
-            return;
-        }
-
-        $livro = $this->livroModel->criarLivro($titulo, $autor, $ano, $idUsuario);
-
-        echo json_encode([
-            "menagem" => "Dados recebidos com sucesso",
-            "id_usuario_logado" => $idUsuario,
-            "titulo" => $titulo,
-            "autor" => $autor,
-            "ano" => $ano
-        ]);
-    }
-}
