@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/../models/Livro.php';
 require_once __DIR__ . '/../DTO/CreateLivroDTO.php';
+require_once __DIR__ . '/../DTO/UpdateLivroDTO.php';
 require_once __DIR__ . '/../middleware/AuthMiddleware.php';
 
 class LivroController { 

@@ -93,6 +93,7 @@ class AuthController
             "access_token" => $accessToken,
             "UUID" => $usuario["UUID"],
             "nome" => $usuario["nome"],
+            "email" => $usuario["email"],
             "foto_perfil" => $usuario["foto_perfil"] ?? null
         ]);
 

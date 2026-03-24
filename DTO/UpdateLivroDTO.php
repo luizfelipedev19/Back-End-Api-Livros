@@ -54,7 +54,7 @@ class UpdateLivroDTO {
         }
 
         if($this->status !== null){
-            $statusValido = ['lendo', 'lido', 'quero ler'];
+            $statusValido = ['lendo', 'lido', 'quero_ler'];
             if (!in_array($this->status, $statusValido)){
                 throw new Exception("Status inválido. Os status válidos são: " . implode(", ", $statusValido));
             }
