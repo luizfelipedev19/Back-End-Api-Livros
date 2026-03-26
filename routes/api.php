@@ -55,5 +55,12 @@ return [
     "controller" => "UsuarioController",
     "action" => "atualizarFoto",
     "auth" => true
+    ],
+    [
+    "method" => "POST",
+    "path" => "/senha",
+    "controller" => "SenhaController",
+    "action" => "solicitarRecuperacao",
+    "auth" => false
     ]
 ];
