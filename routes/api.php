@@ -58,9 +58,16 @@ return [
     ],
     [
     "method" => "POST",
-    "path" => "/senha",
+    "path" => "/recuperar-senha",
     "controller" => "SenhaController",
     "action" => "solicitarRecuperacao",
+    "auth" => false
+    ],
+    [
+    "method" => "POST",
+    "path" => "/redefinir-senha",
+    "controller" => "SenhaController",
+    "action" => "redefinirSenha",
     "auth" => false
     ]
 ];
