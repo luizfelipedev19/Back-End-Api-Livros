@@ -156,10 +156,14 @@ class Livro {
     }
 
     public function listarComFiltros(
-        int $idUsuario,
+        string $uuid,
         string $titulo = '',
         string $autor = '',
         ?int $ano = null,
+        string $genero = '',
+        ?string $status = '',
+        ?int $avaliacao = null,
+        ?string $anotacoes = null,
         int $page = 1,
         int $limit = 10,
         string $sort = 'id_livro',
@@ -168,8 +172,8 @@ class Livro {
 
         $offset = ($page - 1) * $limit;
 
-        $where = "WHERE usuario_id = :id_usuario";
-        $params = [':id_usuario' => $idUsuario];
+        $where = "WHERE usuario_id = (select id_usuario from usuarios where UUID = :uuid)";
+        $params = [':uuid' => $uuid];
 
         if ($titulo !== '') {
             $where .= " AND titulo LIKE :titulo";
@@ -186,6 +190,23 @@ class Livro {
             $params[':ano'] = $ano;
         }
 
+        if ($genero !== '') {
+            $where .= " AND genero LIKE :genero";
+            $params[':genero'] = '%' . $genero . '%';
+        }
+        if ($status !== '') {
+            $where .= " AND status = :status";
+            $params[':status'] = $status;
+        }
+        if ($avaliacao !== null && $avaliacao > 0) {
+            $where .= " AND avaliacao = :avaliacao";
+            $params[':avaliacao'] = $avaliacao;
+        }
+        if ($anotacoes !== null && $anotacoes !== '') {
+            $where .= " AND anotacoes LIKE :anotacoes";
+            $params[':anotacoes'] = '%' . $anotacoes . '%';
+        }
+
         $sqlCount = "SELECT COUNT(*) AS total FROM {$this->table} {$where}";
         $stmtCount = $this->conn->prepare($sqlCount);
 
@@ -193,7 +214,7 @@ class Livro {
             $stmtCount->bindValue(
                 $key,
                 $value,
-                ($key === ':id_usuario' || $key === ':ano') ? PDO::PARAM_INT : PDO::PARAM_STR
+                ($key === ':uuid' || $key === ':ano') ? PDO::PARAM_INT : PDO::PARAM_STR
             );
         }
 

@@ -159,9 +159,11 @@ class LivroController {
     public function deletarLivro(): void {
         $usuario = AuthMiddleware::autenticar();
         $uuid = $usuario->data->UUID ?? null;
+
         
-        //pegar o id do livro pela url
-        $idLivro = $_GET['id_livro'] ?? null;
+        //pegar o id do livro pelo body
+        $data = json_decode(file_get_contents("php://input"), true) ?? [];
+        $idLivro = $data['id_livro'] ?? null;
 
         if(!$idLivro) {
             http_response_code(400);
@@ -189,11 +191,16 @@ class LivroController {
 
     public function listarLivros(): void {
         $usuario = AuthMiddleware::autenticar();
-        $idUsuario = $usuario->data->id_usuario;
+        $uuid = $usuario->data->UUID ?? null;
 
         $titulo = trim($_GET['titulo'] ?? '');
         $autor  = trim($_GET['autor'] ?? '');
         $ano    = isset($_GET['ano']) && $_GET['ano'] !== '' ? (int) $_GET['ano'] : null;
+        $genero = trim($_GET['genero'] ?? '');
+        $status = trim($_GET['status'] ?? '');
+        $avaliacao = isset($_GET['avaliacao']) && $_GET['avaliacao'] !== '' ? (int) $_GET['avaliacao'] : null;
+        $anotacoes = trim($_GET['anotacoes'] ?? '');
+
         $page   = isset($_GET['page']) ? (int) $_GET['page'] : 1;
         $limit  = isset($_GET['limit']) ? (int) $_GET['limit'] : 10;
         $sort   = $_GET['sort'] ?? 'id_livro';
@@ -203,15 +210,21 @@ class LivroController {
         if ($limit < 1) $limit = 10;
         if ($limit > 100) $limit = 100;
 
-        $allowedSort = ['id_livro', 'titulo', 'autor', 'ano'];
+        $allowedSort = ['id_livro', 'titulo', 'autor', 'ano', 'genero', 'status', 'avaliacao', 'anotacoes'];
+
+        // Valida os parâmetros de ordenação garantindo valores permitidos e evitando entradas inválidas ou inseguras
         if (!in_array($sort, $allowedSort, true)) $sort = 'id_livro';
         if (!in_array($order, ['asc', 'desc'], true)) $order = 'asc';
 
         $resultado = $this->livroModel->listarComFiltros(
-            $idUsuario,
+            $uuid,
             $titulo,
             $autor,
             $ano,
+            $genero,
+            $status,
+            $avaliacao,
+            $anotacoes,
             $page,
             $limit,
             $sort,
@@ -222,7 +235,8 @@ class LivroController {
         echo json_encode([
             'success'   => true,
             'detail' => [
-              "livros" => [ ['titulo' => $titulo, 'autor' => $autor, 'ano' => $ano],
+              "livros" => [ ['titulo' => $titulo, 'autor' => $autor, 'ano' => $ano,
+              'genero' => $genero, 'status' => $status, 'avaliacao' => $avaliacao, 'anotacoes' => $anotacoes],
               ],
             'paginacao' => [
                 'page'        => $resultado['page'],
@@ -239,9 +253,9 @@ class LivroController {
     public function listarUmLivro(): void {
         $usuario = AuthMiddleware::autenticar();
         $uuid = $usuario->data->UUID ?? null;
+        $data = json_decode(file_get_contents("php://input"), true) ?? [];
 
-        // pegar o id do livro pela url
-        $idLivro = $_GET['id_livro'] ?? null;
+        $idLivro = $data['id_livro'] ?? null;
 
         if(!$uuid){
             http_response_code(400);

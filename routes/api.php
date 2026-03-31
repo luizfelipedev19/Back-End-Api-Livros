@@ -37,7 +37,7 @@ return [
     ],
     [
         "method" => "GET",
-        "path" => "/livro",
+        "path" => "/livro/encontrar",
         "controller" => "LivroController",
         "action" => "listarUmLivro",
         "auth" => true
