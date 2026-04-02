@@ -114,8 +114,8 @@ class SenhaController {
             return true;
 
         } catch(Exception $e){
-            echo "Erro PHPMailer: " . $e->getMessage();
-            exit;
+            error_log("Erro PHPMailer: " . $e->getMessage());
+            return false;
         }
     }
 
@@ -134,16 +134,16 @@ class SenhaController {
             return;
         }
 
-        if ($senhaNova === '') {
+        if (mb_strlen($senhaNova) < 8) {
             http_response_code(400);
             echo json_encode([
                 "success" => false,
-                "mensagem" => "Senha é obrigatória"
+                "mensagem" => "A senha deve ter pelo menos 8 caracteres"
             ]);
             return;
-        }
+        }       
 
-        // 🔐 Converte token recebido para hash
+        //Converte token recebido para hash
         $tokenHash = hash('sha256', $token);
 
         $agora = date('Y-m-d H:i:s');
@@ -174,21 +174,23 @@ class SenhaController {
             return;
         }
 
-        // 🔒 Atualiza senha
+        //  Atualiza senha
         $senhaHash = password_hash($senhaNova, PASSWORD_DEFAULT);
 
         $stmtSenha = $this->db->prepare("
             UPDATE usuarios 
-            SET senha_hash = :senha 
+            SET senha_hash = :senha,
+                updated_at = :updated_at
             WHERE id_usuario = :id
         ");
 
         $stmtSenha->execute([
             'senha' => $senhaHash,
+            'updated_at' => date('Y-m-d H:i:s'),
             'id' => $registro['usuario_id']
         ]);
 
-        // 🔒 Marca token como usado
+        //  Marca token como usado
         $stmtToken = $this->db->prepare("
             UPDATE senha_recuperacao 
             SET usado = 1 

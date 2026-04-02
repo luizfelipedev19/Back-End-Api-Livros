@@ -258,18 +258,100 @@ class Livro {
         ];
     }
 
-    public function encontrarLivro(int $idLivro, string $uuid): ?array {
-        $query = "Select id_livro, titulo, autor, ano, genero, status, avaliacao, anotacoes
-        FROM {$this->table}
-        WHERE id_livro = :idLivro
-        and usuario_id = (Select id_usuario from usuarios where UUID = :uuid)";
+    public function encontrarLivro($data, string $uuid): ?array {
+        $where = "WHERE usuario_id = (Select id_usuario from usuarios where UUID = :uuid)";
+        $params = [':uuid' => $uuid];
+
+        // Normalize incoming $data: accept JSON string, object or array
+        if (is_string($data)) {
+            $decoded = json_decode($data, true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                $data = $decoded;
+            }
+        }
+
+        if (is_object($data)) {
+            $data = (array)$data;
+        }
+
+        // If decoded/received array is associative (single filter object), wrap it into a list
+        if (is_array($data)) {
+            $isAssoc = array_keys($data) !== range(0, count($data) - 1);
+            if ($isAssoc) {
+                $data = [$data];
+            }
+        }
+
+        if (is_array($data) && !empty($data)) {
+            $allowed = ['id_livro', 'titulo', 'autor', 'ano', 'genero', 'status', 'avaliacao', 'anotacoes'];
+            $conds = [];
+            $i = 0;
+
+            
+            //tarefa para semana que vem, adicionar a paginação dentro desse endpoint.
+            foreach ($data as $item) {
+                $entry = is_object($item) ? (array)$item : (array)$item;
+               
+                foreach ($entry as $key => $value) {
+                    $key = trim((string)$key);
+                    if ($value === null || $value === '') {
+                        continue;
+                    }
+                    if (!in_array($key, $allowed, true)) {
+                        continue;
+                    }
+
+                    $param = ":p{$i}";
+                    if ($key === 'ano' || $key === 'avaliacao') {
+                        // numeric fields use exact match
+                        $conds[] = "{$key} = {$param}";
+                        $params[$param] = (int) $value;
+                    } else {
+                        // use LIKE for string fields
+                        $conds[] = "{$key} LIKE {$param}";
+                        $params[$param] = '%' . $value . '%';
+
+                        //Entre as duas porcentagens, ele faz uma busca completa. Se mandar livro = ceu, ele vai encontrar "O céu é azul", "Céu estrelado", "Céu e inferno", etc. Se mandar livro = ceu%, ele vai encontrar "Céu é azul", "Céu estrelado", mas não "O céu é azul". Se mandar livro = %ceu, ele vai encontrar "O céu é azul", mas não "Céu estrelado". Se mandar livro = ceu, ele vai encontrar apenas "Céu".
+                    }
+                    $i++;
+                }
+            }
+
+            if (!empty($conds)) {
+                $where .= ' AND ' . implode(' AND ', $conds);
+            }
+        }
+
+        $query = "SELECT id_livro, titulo, autor, ano, genero, status, avaliacao, anotacoes
+                  FROM {$this->table}
+                  {$where}
+                  LIMIT 1";
 
         $stmt = $this->conn->prepare($query);
-        $stmt->bindValue(":idLivro", $idLivro, PDO::PARAM_INT);
-        $stmt->bindValue(":uuid", $uuid, PDO::PARAM_STR);
-        $stmt->execute();
 
+        foreach ($params as $key => $val) {
+            if ($val === null) {
+                $stmt->bindValue($key, null, PDO::PARAM_NULL);
+                continue;
+            }
+
+            if (is_int($val)) {
+                $stmt->bindValue($key, $val, PDO::PARAM_INT);
+                continue;
+            }
+
+            // If parameter name indicates numeric but value came as string, try cast when numeric
+            if ((($key === ':ano' || $key === ':avaliacao') || strpos($key, ':p') === 0) && is_numeric($val)) {
+                $stmt->bindValue($key, (int) $val, PDO::PARAM_INT);
+                continue;
+            }
+
+            $stmt->bindValue($key, $val, PDO::PARAM_STR);
+        }
+        $livro = $stmt->execute();
         $livro = $stmt->fetch(PDO::FETCH_ASSOC);
-        return $livro ?: null;
+        $livro = $livro ?: [];
+        return $livro;
     }
+// ...existing code...
 }

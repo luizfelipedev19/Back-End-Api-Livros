@@ -11,6 +11,8 @@ class LivroController {
 
     public function __construct(PDO $db){
         $this->livroModel = new Livro($db);
+
+        //this->data
     }
 
     public function criarLivro(): void {
@@ -255,8 +257,6 @@ class LivroController {
         $uuid = $usuario->data->UUID ?? null;
         $data = json_decode(file_get_contents("php://input"), true) ?? [];
 
-        $idLivro = $data['id_livro'] ?? null;
-
         if(!$uuid){
             http_response_code(400);
             echo json_encode([
@@ -266,19 +266,16 @@ class LivroController {
             return;
         }
 
-        if(!$idLivro){
-            http_response_code(400);
-            echo json_encode([
-                "success" => false, 
-                "mensagem" => "Id do livro é obrigatório"
-            ]);
-            return; 
-        }
+        
+    
 
-        $livroEncontrado = $this->livroModel->encontrarLivro(
-            (int) $idLivro,
-            $uuid);
-        if(!$livroEncontrado){
+        $livroEncontrado = $this->livroModel->encontrarLivro($data, $uuid);
+        $livroCount = count($livroEncontrado);
+
+
+
+
+        if($livroCount === 0){
             http_response_code(404);
             echo json_encode([
                 "success" => false,

@@ -8,6 +8,8 @@ class Database
     private string $username;
     private string $password;
     public ?PDO $conn = null;
+
+    
     public function __construct(){
        $this->host = $_ENV["DB_HOST"];
        $this->port = $_ENV["DB_PORT"];
