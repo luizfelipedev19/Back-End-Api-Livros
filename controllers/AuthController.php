@@ -4,8 +4,10 @@ require_once __DIR__ . '/../models/Livro.php';
 require_once __DIR__ . '/../utils/jwt.php';
 require_once __DIR__ . '/../DTO/RegisterUserDTO.php';
 require_once __DIR__ . '/../DTO/LoginDTO.php';
+require_once __DIR__ . '/../base/BaseController.php';
 
-class AuthController
+
+class AuthController extends BaseController
 {
 
     private Usuarios $usuarioModel;
@@ -13,6 +15,7 @@ class AuthController
 
     public function __construct(PDO $db)
     {
+        parent::__construct(false);
         $this->usuarioModel = new Usuarios($db);
         $this->jwtHandler = new JwtHandler();
     }
@@ -20,16 +23,12 @@ class AuthController
     public function register(): void
     {
         try { 
-        $data = json_decode(file_get_contents("php://input"), true);
-
-        $dto = new RegisterUserDTO($data);
+        $dto = new RegisterUserDTO($this->data);
 
         $usuarioExistente = $this->usuarioModel->buscarPorEmail($dto->email);
 
         if ($usuarioExistente) {
-            http_response_code(409);
-            echo json_encode(["success" => "false",
-                "mensagem" => "Email já cadastrado"]);
+            $this->error("Email já cadastrado", 400);
             return;
         }
 
@@ -41,91 +40,73 @@ class AuthController
             $dto->senha_hash,
             $uuid);
 
-        if ($criado) {
-            http_response_code(201);
-            echo json_encode(["success" => true,
-            "mensagem" => "Usuário criado com sucesso",
-            ]);
-            return;
+        if(!$criado){
+            $this->error("Erro ao cadastrar usuário", 500);
         }
 
-        http_response_code(500);
-        echo json_encode(["success" => "false",
-            "mensagem" => "Erro ao cadastrar usuário"]);
+            $this->success([
+                "mensagem" => "Usuário registrado com sucesso",
+            ], 201);
+    
+        
 
     } catch(Exception $e){
-        http_response_code(400);
+        $this->error("Erro ao cadastrar usuário", 400);
         echo json_encode(["success" => false,
         "mensagem" => $e->getMessage()]);
         
     }
 } 
 
-    private function gerarUUIDUsuario(int $tamanho = 30): string {
-        return substr(bin2hex(random_bytes(20)), 0, $tamanho);
-    }
-
-
-
     public function login(): void
     {
 
         try{
-        $data = json_decode(file_get_contents("php://input"), true);
-
-        $dto = new LoginDTO($data);
+        $dto = new LoginDTO($this->data);
 
         $usuario = $this->usuarioModel->buscarPorEmail($dto->email);
 
         if (!$usuario || !password_verify($dto->senha, $usuario["senha_hash"])) {
-            http_response_code(401);
-            echo json_encode(["success" => false,
-             "mensagem" => "Email ou senha inválidos"]);
-            return;
+            $this->error("Email ou senha inválidos", 401);
+            return; 
         }
 
         $accessToken = $this->jwtHandler->gerarToken($usuario);
 
-        http_response_code(200);
-        echo json_encode([
-            "success" => true,
+        $this->success([
             "mensagem" => "Login realizado com sucesso",
             "access_token" => $accessToken,
             "UUID" => $usuario["UUID"],
             "nome" => $usuario["nome"],
             "email" => $usuario["email"],
             "foto_perfil" => $usuario["foto_perfil"] ?? null
-        ]);
+        ], 200);
 
     } catch(Exception $e){
-        http_response_code(400);
-        echo json_encode([
-            "success" => false,
-            "mensagem" => $e->getMessage()
-        ]);
+        $this->error($e->getMessage(), 400);
     }
 }
 
     public function perfil()
     {
-        $usuario = AuthMiddleware::autenticar();
+       $this->requireAuth();
+
+       $usuario = AuthMiddleware::autenticar();
 
         if(($usuario->type ?? null) !== "access"){
-            http_response_code(401);
-            echo json_encode([
-                "success" => false, 
-                "mensagem" => "Token inválido para acesso"
-            ]);
+            $this->error("Token inválido para acesso", 401);
             return;
+        
         }
-
-        $idUsuario = $usuario->data->id_usuario;
-
-        echo json_encode([
+        $this->success([
             "success" => true,
             "mensagem" => "Perfil acessado com sucesso",
-            "id_usuario" => $idUsuario,
+            "id_usuario" => $usuario->data->id_usuario,
             "usuario" => $usuario->data
         ]);
+    }
+
+    private function gerarUUIDUsuario(int $tamanho = 30): string {
+        return substr(bin2hex(random_bytes(20)), 0, $tamanho);
     }
 }

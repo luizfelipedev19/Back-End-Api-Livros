@@ -4,47 +4,31 @@ require_once __DIR__ . '/../models/Livro.php';
 require_once __DIR__ . '/../DTO/CreateLivroDTO.php';
 require_once __DIR__ . '/../DTO/UpdateLivroDTO.php';
 require_once __DIR__ . '/../middleware/AuthMiddleware.php';
+require_once __DIR__ . '/../base/BaseController.php';
 
-class LivroController { 
+class LivroController extends BaseController{ 
 
     private Livro $livroModel;
 
-    public function __construct(PDO $db){
+     public function __construct(PDO $db){
+        parent::__construct();
         $this->livroModel = new Livro($db);
-
-        //this->data
     }
 
     public function criarLivro(): void {
-        $usuario = AuthMiddleware::autenticar();
-        $uuid = $usuario->data->UUID;
-        $data = json_decode(file_get_contents("php://input"), true) ?? [];
-
-        if(!$uuid){
-            http_response_code(401);
-            echo json_encode([
-                "success" => false,
-                "mensagem" => "UUID do usuário não encontrado"
-            ]);
-            return;
-        }
+    $this->requireAuth();
 
         try {
-            $dto = new CreateLivroDTO($data);
+            $dto = new CreateLivroDTO($this->data);
         } catch (Exception $e) {
-            http_response_code(400);
-            echo json_encode([
-                "success" => false,
-                "mensagem" => $e->getMessage()
-            ]);
-            return;
+           $this->error($e->getMessage(), 400);
         }
 
         $idLivro = $this->livroModel->criarLivro(
             $dto->titulo,
             $dto->autor,
             $dto->ano,
-            $uuid,
+            $this->uuid,
             $dto->genero,
             $dto->status,
             $dto->avaliacao,
@@ -52,69 +36,35 @@ class LivroController {
         );
 
         if (!$idLivro) {
-            http_response_code(500);
-            echo json_encode([
-                "success" => false,
-                "mensagem" => "Erro ao criar livro"
-            ]);
-            return;
+            $this->error("Erro ao criar livro", 500);
         }
 
-        http_response_code(201);
-        echo json_encode([
-            "success" => true,
+        $this->success([
             "mensagem" => "Livro criado com sucesso",
-            "detail" => [
-                "id:" => $idLivro,
-            ]
-        ]);
+            "id" => $idLivro
+        ], 201);
+
     }
 
     public function atualizarLivro(): void {
-        $usuario = AuthMiddleware::autenticar();
-        $uuid = $usuario->data->UUID ?? null;
-        $data = json_decode(file_get_contents("php://input"), true) ?? [];
-        $idLivro = $data['id_livro'] ?? null;
-
-        if(!$uuid){
-            http_response_code(401);
-            echo json_encode([
-                "success" => false, 
-                "mensagem" => "UUID do usuário não encontrado"
-            ]);
-            return;
-        }
+        $this->requireAuth();
+        $idLivro = $this->data['id_livro'] ?? null;
 
         if(!$idLivro){
-            http_response_code(400);
-            echo json_encode([
-                "success" => false,
-                "mensagem" => "Id do livro é obrigatório"
-            ]);
+            $this->error("Id do livro é obrigatório", 400);
             return;
         }
 
-        $livroAtual = $this->livroModel->buscarPorId((int) $idLivro, $uuid);
+        $livroAtual = $this->livroModel->buscarPorId((int) $idLivro, $this->uuid);
 
         if(!$livroAtual){
-            http_response_code(404);
-            echo json_encode([
-                "success" => false,
-                "mensagem" => "Livro não encontrado"
-            ]);
+            $this->error("Livro não encontrado", 404);
             return;
         }
-
-        
-        
         try {
-            $dto = new UpdateLivroDTO($data);
+            $dto = new UpdateLivroDTO($this->data);
         } catch (Exception $e){
-            http_response_code(400);
-            echo json_encode([
-                "success" => false,
-                "mensagem" => $e->getMessage()
-            ]);
+            $this->error($e->getMessage());
             return;
         }
 
@@ -122,8 +72,8 @@ class LivroController {
         (int) $idLivro,
         $dto->titulo ?? $livroAtual['titulo'],
         $dto->autor ?? $livroAtual['autor'],
-        $dto->ano ?? $livroAtual['ano'],
-        $uuid,
+        $dto->ano ?? ((int) ($livroAtual['ano'] ?? 0)),
+        $this->uuid,
         $dto->genero ?? ($livroAtual['genero'] ?? null),
         $dto->status ?? ($livroAtual['status'] ?? 'quero_ler'),
         $dto->avaliacao ?? ($livroAtual['avaliacao'] ?? null),
@@ -131,17 +81,11 @@ class LivroController {
 );
 
         if(!$atualizado){
-            http_response_code(500);
-            echo json_encode([
-                "success" => false,
-                "mensagem" => "Erro ao atualizar livro"
-            ]);
+            $this->error("Erro ao atualizar livro", 500);
             return;
         }
 
-        http_response_code(200);
-        echo json_encode([
-            "success" => true,
+        $this->success([
             "mensagem" => "Livro atualizado com sucesso",
             "detail" => [
                 "livro" => [
@@ -159,38 +103,24 @@ class LivroController {
     }
 
     public function deletarLivro(): void {
-        $usuario = AuthMiddleware::autenticar();
-        $uuid = $usuario->data->UUID ?? null;
-
-        
+        $this->requireAuth();
         //pegar o id do livro pelo body
-        $data = json_decode(file_get_contents("php://input"), true) ?? [];
-        $idLivro = $data['id_livro'] ?? null;
+        $this->data;
+        $idLivro = $this->data['id_livro'] ?? null;
 
         if(!$idLivro) {
-            http_response_code(400);
-            echo json_encode(["mensagem" => "Id do livro é obrigatório"]);
-            return;
+            $this->error("Id do livro é obrigatório", 400);
         }
 
-        $deletado = $this->livroModel->deletarLivro((int) $idLivro, $uuid);
+        $deletado = $this->livroModel->deletarLivro((int) $idLivro, $this->uuid);
 
         if(!$deletado){
-            http_response_code(404);
-            echo json_encode(["mensagem" => "Livro não encontrado"]);
-            return;
+            $this->error("Livro não encontrado", 404);
         }
 
         http_response_code(204);
-        echo json_encode([
-            "success" => true,
-            "mensagem" => "Livro deletado com sucesso",
-            "detail:" => [
-
-            ]
-        ]);
     }
-
+/*
     public function listarLivros(): void {
         $usuario = AuthMiddleware::autenticar();
         $uuid = $usuario->data->UUID ?? null;
@@ -251,46 +181,39 @@ class LivroController {
             ]
         ]);
     }
+*/
+    public function listarLivros(): void {
+        $this->requireAuth();
 
-    public function listarUmLivro(): void {
-        $usuario = AuthMiddleware::autenticar();
-        $uuid = $usuario->data->UUID ?? null;
-        $data = json_decode(file_get_contents("php://input"), true) ?? [];
+        $page = isset($_GET['page']) ? (int) $_GET['page'] : 1;
+        $limit = isset($_GET['limit']) ? (int) $_GET['limit'] : 10;
 
-        if(!$uuid){
-            http_response_code(400);
-            echo json_encode([
-                "success" => false, 
-                "mensagem" => "UUID do usuário não encontrado"
-            ]);
-            return;
-        }
+        if ($page < 1) $page = 1;
+        if ($limit < 1) $limit = 10;
+        if ($limit > 100) $limit = 100;
 
-        
-    
-
-        $livroEncontrado = $this->livroModel->encontrarLivro($data, $uuid);
+        $livroEncontrado = $this->livroModel->encontrarLivro($this->data, $this->uuid);
         $livroCount = count($livroEncontrado);
 
 
-
-
         if($livroCount === 0){
-            http_response_code(404);
-            echo json_encode([
-                "success" => false,
-                "mensagem" => "Livro não encontrado"
-            ]);
+            $this->error("Nenhum livro encontrado", 404);
             return;
         }
 
-        http_response_code(200);
-        echo json_encode([
-            "success" => true, 
+        $this->success([
             "detail" => [
-                "livro" => $livroEncontrado
+                "livros" => [
+                    ['titulo' => $livroEncontrado['titulo'] ?? '', 'autor' => $livroEncontrado['autor'] ?? '', 'ano' => $livroEncontrado['ano'] ?? null,
+                    'genero' => $livroEncontrado['genero'] ?? '', 'status' => $livroEncontrado['status'] ?? '', 'avaliacao' => $livroEncontrado['avaliacao'] ?? null, 'anotacoes' => $livroEncontrado['anotacoes'] ?? ''],
+                ],
+                'paginacao' => [
+                    'page'        => $page,
+                    'limit'       => $limit,
+                    'total'       => $livroCount,
+                    'total_pages' => ceil($livroCount / $limit)
+                ],
             ]
         ]);
-
     }
 }

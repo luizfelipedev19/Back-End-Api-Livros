@@ -2,21 +2,26 @@
 
 require_once __DIR__ . '../../DTO/recuperarSenhaDTO.php';
 require_once __DIR__ . '/../models/Usuarios.php';
-require_once __DIR__ . '/../vendor/autoload.php'; 
+require_once __DIR__ . '/../vendor/autoload.php';
+require_once __DIR__ . '/../utils/enviarEmail.php'; 
 
 class SenhaController {
     private Usuarios $usuarioModel;
     private PDO $db;
+    private array $data;
+    private enviarEmail $enviarEmail;
 
     public function __construct(PDO $db){
         $this->usuarioModel = new Usuarios($db);
         $this->db = $db;
+        $this->data = json_decode(file_get_contents("php://input"), true) ?? [];
+        $this->enviarEmail = new enviarEmail();
     }
 
     public function solicitarRecuperacao(): void {
-        $data = json_decode(file_get_contents("php://input"), true) ?? [];
+        $this->data;
 
-        $emailUsuario = trim($data['email'] ?? '');
+        $emailUsuario = trim($this->data['email'] ?? '');
 
         if(!$emailUsuario){
             http_response_code(400);
@@ -73,57 +78,17 @@ class SenhaController {
     }
 
     private function enviarEmailRecuperacao(string $email, string $nome, string $token): bool {
-        $mail = new PHPMailer\PHPMailer\PHPMailer(true);
+        
+    $enviarEmailUsuario = new enviarEmail();
 
-        try {
-            $mail->isSMTP();
-            $mail->Host = 'smtp.gmail.com';
-            $mail->SMTPAuth = true;
-            $mail->Username = $_ENV['MAIL_USER'];
-            $mail->Password = $_ENV['MAIL_PASS'];
-            $mail->SMTPSecure = PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
-            $mail->Port = 587;
-            $mail->CharSet = 'UTF-8';
-
-            $mail->setFrom($_ENV['MAIL_USER'], 'BookManager');
-            $mail->addAddress($email, $nome);
-
-            $linkRecuperacao = "http://192.168.0.38:8082/Front-Biblioteca/redefinir-senha?token=" . $token;
-
-            $mail->isHTML(true);
-            $mail->Subject = 'Recuperação de senha - BookManager';
-            $mail->Body = "
-                <h1>Olá, {$nome}</h1>
-                <p>Recebemos uma solicitação para redefinir a sua senha.</p>
-                <p>Clique no botão abaixo para criar uma nova senha:</p>
-                <a href='{$linkRecuperacao}' style='
-                    background: #3b82f6;
-                    color: white;
-                    padding: 12px 24px;
-                    border-radius: 8px;
-                    text-decoration: none;
-                    display: inline-block;
-                    margin: 20px 0;
-                '>Redefinir senha</a>
-                <p>Este link expira em <strong>1 hora</strong>.</p>
-                <p>Se você não solicitou isso, ignore este email.</p>
-            ";
-
-
-            $mail->send();
-            return true;
-
-        } catch(Exception $e){
-            error_log("Erro PHPMailer: " . $e->getMessage());
-            return false;
-        }
+    return $enviarEmailUsuario->$this->enviarEmail($email, $nome, $token);
     }
 
     public function redefinirSenha(): void {
-        $data = json_decode(file_get_contents("php://input"), true) ?? [];
+        $this->data;
 
-        $token = $data['token'] ?? '';
-        $senhaNova = trim($data['senha'] ?? '');
+        $token = $this->data['token'] ?? '';
+        $senhaNova = trim($this->data['senha'] ?? '');
 
         if ($token === '') {
             http_response_code(400);

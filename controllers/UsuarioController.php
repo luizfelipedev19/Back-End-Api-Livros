@@ -2,184 +2,138 @@
 require_once __DIR__ . '/../models/Usuarios.php';
 require_once __DIR__ . '/../middleware/AuthMiddleware.php';
 require_once __DIR__ . '/../utils/verificarEmail.php';
+require_once __DIR__ . '/../base/BaseController.php';
 
 
-class UsuarioController
+class UsuarioController extends BaseController
 {
     private Usuarios $usuarioModel;
     private PDO $conn;
 
     public function __construct(PDO $db)
     {
+        parent::__construct();
         $this->usuarioModel = new Usuarios($db);
         $this->conn = $db;
     }
-
-
     //método que atualiza a foto de perfil do usuário
     public function atualizarFoto(): void {
-        $usuario = AuthMiddleware::autenticar();
-        $idUsuario = $usuario->data->id_usuario;
+    $this->requireAuth();
 
+    $idUsuario = $this->user->data->id_usuario; // 🔥 corrigido
 
-        //pega o corpo bruto do body
-        $rawInput = file_get_contents("php://input");
+    $urlFoto = $this->data["url_foto"] ?? null;
 
-        file_put_contents(__DIR__ . '/../debug_back.log', 
-        "RAW: $rawInput" . PHP_EOL, 
-        FILE_APPEND
-    );
-
-        $data = json_decode($rawInput, true);
-        $urlFoto = $data["url_foto"] ?? null;
-
-        if(!$urlFoto){
-            http_response_code(400);
-            echo json_encode([
-                "success" => false,
-                "mensagem" => "A URL da foto não pode ser vazia"
-            ]);
-            return;
-        }
-
-        if(!filter_var($urlFoto, FILTER_VALIDATE_URL)){
-            http_response_code(400);
-            echo json_encode([
-                "success" => false,
-                "mensagem" => "A URL da foto é inválida"
-            ]);
-            return;
-        }
-        $atualizado = $this->usuarioModel->atualizarFoto($idUsuario, $urlFoto);
-
-
-        if(!$atualizado){
-            http_response_code(500);
-            echo json_encode([
-                "success" => false,
-                "mensagem" => "Erro ao atualziar a foto de perfil"
-            ]);
-            return;
-        }
-        http_response_code(200);
-        echo json_encode([
-            "success" => true,
-            "mensagem" => "Foto de perfil atualizada com sucesso",
-            "foto_perfil" => $urlFoto
-        ]);
+    if(!$urlFoto){
+        $this->error("A URL da foto não pode ser vazia", 400);
+        return;
     }
 
+    if(!filter_var($urlFoto, FILTER_VALIDATE_URL)){
+        $this->error("A URL da foto é inválida", 400);
+        return;
+    }
+
+    $atualizado = $this->usuarioModel->atualizarFoto($idUsuario, $urlFoto);
+
+    if(!$atualizado){
+        $this->error("Erro ao atualizar a foto de perfil", 500);
+        return;
+    }
+
+    $this->success([
+        "mensagem" => "Foto de perfil atualizada com sucesso",
+        "foto_perfil" => $urlFoto
+    ]);
+}
 
     //função para editar os dados do usuário logado, como nome e email
     function editarUsuarioLogado(): void {
-        $usuario = AuthMiddleware::autenticar();
+        $this->requireAuth();
 
         //pegando o id do usuário que vem no usuário autenticado
-        $idUsuario = $usuario->data->id_usuario;
+        $idUsuario = $this->user->data->id_usuario;
         
         //pegando o UUID do usuário autenticado
-        $uuid = $usuario->data->UUID;
+        $uuid = $this->user->data->UUID;
 
         //pegando o que vem do body
-        $dados = json_decode(file_get_contents("php://input"), true) ?? [];
+        $this->data;
 
         //instanciando a classe verificarEmail
         $validar = new verificarEmail($this->conn);
 
 
         //verificando se o e-mail existe e se já está em uso por outro usuário
-        if(isset($dados['email'])){
-            if($validar->verificarEmailEmUso($dados['email'], $uuid)){
-                http_response_code(409);
-                echo json_encode([
-                    "success" => false,
-                    "mensagem" => "O email já está em uso por outro usuário"
-                ]);
+        if(isset($this->data['email'])){
+            if($validar->verificarEmailEmUso($this->data['email'], $this->uuid)){
+                $this->error("O email ja esta em uso por outro usuario", 409);
                 return;
             }
         }
 
-        $atualizado = $this->usuarioModel->editarUsuario($idUsuario, $uuid, $dados);
+        $atualizado = $this->usuarioModel->editarUsuario($idUsuario, $uuid, $this->data);
 
         if(!$atualizado){
-            http_response_code(500);
-            echo json_encode([
-                "success" => false,
-                "mensagem" => "Erro ao atualizar usuário"
-            ]);
+            $this->error("Erro ao atualizar usuário", 500);
             return;
         }
 
-        http_response_code(200);
-        echo json_encode([
-            "success" => true,
-            "mensagem" => "Usuário atualizado com sucesso",
-            "detail" => [
-                "Usuario" => [
-                "id_usuario" => $idUsuario]
-                ]
-        ]);
+       $this->success([
+        "mensagem" => "Usuario atualizado com sucesso",
+        "usuario" => [
+            "id_usuario" => $idUsuario
+        ]
+       ]);
 
     }
 
     function deletarUsuario(): void {
+
+    $this->requireAuth();
     // Recupera o usuário autenticado através do token
-    $usuario = AuthMiddleware::autenticar();
 
     // pegando o ID do usuário logado
-    $idUsuario = $usuario->data->id_usuario;
+    $idUsuario = $this->user->data->id_usuario;
 
     //excluindo o usuário do banco de dados
     $deletado = $this->usuarioModel->deletarUsuario($idUsuario);
 
     // Verifica se houve falha na exclusão
     if (!$deletado) {
-        http_response_code(500);
-        echo json_encode([
-            "success" => false,
-            "mensagem" => "Erro ao deletar usuário"
-        ]);
+        $this->error("Erro ao deletar usuário", 500);
         return;
     }
 
     // Retorna sucesso na operação
-    http_response_code(200);
-    echo json_encode([
-        "success" => true,
-        "mensagem" => "Usuário deletado com sucesso"
-    ]);
+   $this->success([
+    "mensagem" => "Usuário deletado com sucesso"
+   ]);
 }
 
     function listarUsuario(): void {
+
+    $this->requireAuth();
     // Recupera o usuário autenticado através do token
-    $usuario = AuthMiddleware::autenticar();
 
     // pegando o UUID do usuário logado 
-    $uuid = $usuario->data->UUID;
+    $uuid = $this->user->data->UUID;
 
     // Busca os dados do usuário no banco
     $dadosUsuario = $this->usuarioModel->listarUsuario($uuid);
 
     // Verifica se o usuário foi encontrado
     if (!$dadosUsuario) {
-        http_response_code(404);
-        echo json_encode([
-            "success" => false,
-            "mensagem" => "Usuário não encontrado"
-        ]);
+        $this->error("Usuário não encontrado", 404);
         return;
     }
 
     // Retorna os dados do usuário
     http_response_code(200);
-    echo json_encode([
-        "success" => true,
-        "mensagem" => "Usuário encontrado",
-        "detail" => [
-            "Usuario" => $dadosUsuario
-        ]
+    $this->success([
+       "mensagem" => "Usuário encontrado",
+       "usuario" => $dadosUsuario
     ]);
 }
 
-    
 }
